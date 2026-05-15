@@ -83,9 +83,19 @@ export interface Debt {
   createdAt: string;
 }
 
+export interface BackupSnapshot {
+  id: string;
+  timestamp: string;
+  data: AppState;
+}
+
 export interface AppState {
   tasks: Record<string, Task>;
   rootTaskIds: string[];
   budgets: Record<string, MonthlyBudget>; // key: YYYY-MM
   debts: Debt[];
+  settings?: {
+    lastBackup?: string;
+    autoBackupEnabled?: boolean;
+  };
 }

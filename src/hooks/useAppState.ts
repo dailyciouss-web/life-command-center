@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
 
 const STORAGE_KEY = 'life_command_center_data';
+const SNAPSHOTS_KEY = 'life_command_center_snapshots';
 
 const INITIAL_TASKS: Record<string, Task> = {
   't1': {
@@ -65,7 +66,11 @@ const INITIAL_STATE: AppState = {
       createdAt: format(new Date(), 'yyyy-MM-dd'),
       notes: 'Lunch last Friday'
     }
-  ]
+  ],
+  settings: {
+    autoBackupEnabled: true,
+    lastBackup: new Date().toISOString()
+  }
 };
 
 export function useAppState() {
@@ -81,9 +86,18 @@ export function useAppState() {
     return INITIAL_STATE;
   });
 
+  const [snapshots, setSnapshots] = useState<any[]>(() => {
+    const saved = localStorage.getItem(SNAPSHOTS_KEY);
+    return saved ? JSON.parse(saved) : [];
+  });
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
+
+  useEffect(() => {
+    localStorage.setItem(SNAPSHOTS_KEY, JSON.stringify(snapshots));
+  }, [snapshots]);
 
   const addTask = useCallback((task: Partial<Task> & { parentId: string | null }) => {
     const id = uuidv4();
@@ -200,11 +214,56 @@ export function useAppState() {
     }));
   }, []);
 
+  const createSnapshot = useCallback((name?: string) => {
+    const newSnapshot = {
+      id: uuidv4(),
+      timestamp: new Date().toISOString(),
+      name: name || `Auto Backup ${format(new Date(), 'MMM d, HH:mm')}`,
+      data: state
+    };
+    setSnapshots(prev => {
+      const next = [newSnapshot, ...prev].slice(0, 10);
+      return next;
+    });
+    
+    setState(prev => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        lastBackup: new Date().toISOString()
+      }
+    }));
+  }, [state]);
+
+  // Auto snapshot logic
+  useEffect(() => {
+    if (!state.settings?.autoBackupEnabled) return;
+
+    const lastBackup = state.settings?.lastBackup ? new Date(state.settings.lastBackup).getTime() : 0;
+    const now = new Date().getTime();
+    const oneDay = 24 * 60 * 60 * 1000;
+
+    if (now - lastBackup > oneDay) {
+      createSnapshot();
+    }
+  }, [state.settings?.autoBackupEnabled, state.settings?.lastBackup, createSnapshot]);
+
+  const restoreSnapshot = useCallback((snapshotData: AppState) => {
+    if (window.confirm("Restore this snapshot? This will overwrite your current data.")) {
+      setState(snapshotData);
+    }
+  }, []);
+
+  const deleteSnapshot = useCallback((id: string) => {
+    setSnapshots(prev => prev.filter(s => s.id !== id));
+  }, []);
+
   const importData = useCallback((data: string) => {
     try {
       const parsed = JSON.parse(data);
-      // Basic validation could be added here
-      setState(parsed);
+      if (window.confirm("Import this backup? This will overwrite your current data.")) {
+        setState(parsed);
+      }
     } catch (e) {
       alert('Invalid backup file');
     }
@@ -222,6 +281,7 @@ export function useAppState() {
 
   return {
     state,
+    snapshots,
     addTask,
     updateTask,
     deleteTask,
@@ -230,6 +290,9 @@ export function useAppState() {
     addDebt,
     importData,
     exportData,
+    createSnapshot,
+    restoreSnapshot,
+    deleteSnapshot,
     setState
   };
 }
