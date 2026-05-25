@@ -14,10 +14,10 @@ const THEMES: Record<NavTab, { primary: string; secondary: string; accent: strin
     highlight: '#6366f1'
   },
   today: {
-    primary: '#312e81',    // Indigo
-    secondary: '#1e1b4b',
-    accent: '#0f172a',
-    highlight: '#818cf8'
+    primary: '#2e1065',    // Violet
+    secondary: '#4c1d95',
+    accent: '#1e1b4b',
+    highlight: '#6366f1'
   },
   finances: {
     primary: '#064e3b',    // Emerald

@@ -34,29 +34,29 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }
             {activeTab === id && (
               <div className={cn(
                 "absolute inset-0 rounded-full blur-md -z-10",
-                id === 'tasks' && "bg-indigo-500/20",
-                id === 'today' && "bg-blue-500/20",
-                id === 'finances' && "bg-emerald-500/30",
-                id === 'debts' && "bg-sky-500/20",
+                id === 'tasks' && "bg-violet-500/25",
+                id === 'today' && "bg-violet-500/25",
+                id === 'finances' && "bg-emerald-500/35",
+                id === 'debts' && "bg-blue-500/25",
                 id === 'settings' && "bg-white/10"
               )} />
             )}
             <Icon size={22} className={cn(
               'transition-transform duration-300',
               activeTab === id && 'scale-110',
-              activeTab === id && id === 'tasks' && "text-indigo-400",
-              activeTab === id && id === 'today' && "text-blue-400",
+              activeTab === id && id === 'tasks' && "text-violet-400",
+              activeTab === id && id === 'today' && "text-violet-400",
               activeTab === id && id === 'finances' && "text-emerald-400",
-              activeTab === id && id === 'debts' && "text-sky-400",
-              activeTab === id && id === 'settings' && "text-white"
+              activeTab === id && id === 'debts' && "text-blue-400",
+              activeTab === id && id === 'settings' && "text-slate-400"
             )} />
             <span className={cn(
               "text-[10px] mt-1 font-medium tracking-tight uppercase transition-colors duration-300",
-              activeTab === id && id === 'tasks' && "text-indigo-300",
-              activeTab === id && id === 'today' && "text-blue-300",
+              activeTab === id && id === 'tasks' && "text-violet-300",
+              activeTab === id && id === 'today' && "text-violet-300",
               activeTab === id && id === 'finances' && "text-emerald-300",
-              activeTab === id && id === 'debts' && "text-sky-300",
-              activeTab === id && id === 'settings' && "text-white/80",
+              activeTab === id && id === 'debts' && "text-blue-300",
+              activeTab === id && id === 'settings' && "text-slate-300",
               activeTab !== id && "text-white/40"
             )}>
               {label}

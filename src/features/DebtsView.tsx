@@ -48,24 +48,24 @@ export const DebtsView: React.FC = () => {
         </div>
         <button 
           onClick={() => setIsAdding(!isAdding)}
-          className="w-12 h-12 bg-indigo-500 rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/20 active:scale-95 transition-transform"
+          className="w-12 h-12 bg-blue-500 hover:bg-blue-400 rounded-full flex items-center justify-center shadow-lg shadow-blue-500/20 active:scale-95 transition-transform text-white"
         >
           <Plus size={24} className={cn("transition-transform", isAdding && "rotate-45")} />
         </button>
       </header>
 
       {isAdding && (
-        <GlassCard className="p-6 flex flex-col gap-4 border-indigo-500/30">
-          <h3 className="text-sm font-bold uppercase tracking-widest">New Entry</h3>
+        <GlassCard className="p-6 flex flex-col gap-4 border-blue-500/30">
+          <h3 className="text-sm font-bold uppercase tracking-widest text-blue-300">New Entry</h3>
           <input 
-            className="bg-white/5 border border-white/10 p-3 rounded-xl focus:outline-none focus:border-indigo-500/50 text-white" 
+            className="bg-white/5 border border-white/10 p-3 rounded-xl focus:outline-none focus:border-blue-500/50 text-white" 
             placeholder="Person Name" 
             value={newDebt.personName}
             onChange={e => setNewDebt({...newDebt, personName: e.target.value})}
           />
           <input 
             type="number"
-            className="bg-white/5 border border-white/10 p-3 rounded-xl focus:outline-none focus:border-indigo-500/50 text-white" 
+            className="bg-white/5 border border-white/10 p-3 rounded-xl focus:outline-none focus:border-blue-500/50 text-white" 
             placeholder="Amount" 
             value={newDebt.amount || ''}
             onChange={e => setNewDebt({...newDebt, amount: Number(e.target.value)})}
@@ -92,7 +92,7 @@ export const DebtsView: React.FC = () => {
           </div>
           <button 
             onClick={handleAdd}
-            className="bg-indigo-500 p-3 rounded-xl font-bold uppercase tracking-widest"
+            className="bg-blue-500 hover:bg-blue-400 text-white p-3 rounded-xl font-bold uppercase tracking-widest"
           >
             Add Registry
           </button>

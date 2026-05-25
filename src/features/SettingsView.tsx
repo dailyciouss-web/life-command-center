@@ -57,11 +57,11 @@ export const SettingsView: React.FC = () => {
             className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors rounded-t-3xl"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
-                <Save size={20} className="text-indigo-400" />
+              <div className="w-10 h-10 rounded-xl bg-slate-500/10 flex items-center justify-center border border-slate-500/20">
+                <Save size={20} className="text-slate-300" />
               </div>
               <div className="text-left">
-                <p className="text-sm font-medium">Create Local Snapshot</p>
+                <p className="text-sm font-medium text-slate-200">Create Local Snapshot</p>
                 <p className="text-[10px] text-white/40">Manual temporary point-in-time recovery</p>
               </div>
             </div>
@@ -154,11 +154,11 @@ export const SettingsView: React.FC = () => {
         <h3 className="text-xs uppercase font-bold tracking-[0.2em] text-white/40 px-1">Security Status</h3>
         <GlassCard className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center">
-                <Shield size={16} className="text-indigo-400" />
+              <div className="w-8 h-8 rounded-full bg-slate-500/20 flex items-center justify-center">
+                <Shield size={16} className="text-slate-300" />
               </div>
               <div>
-                <p className="text-xs font-bold">Auto-Snapshots Active</p>
+                <p className="text-xs font-bold text-slate-200">Auto-Snapshots Active</p>
                 <p className="text-[10px] text-white/40 italic">Last snapshot: {state.settings?.lastBackup ? format(new Date(state.settings.lastBackup), 'HH:mm dd/MM') : 'Never'}</p>
               </div>
             </div>
@@ -172,13 +172,13 @@ export const SettingsView: React.FC = () => {
         <h3 className="text-xs uppercase font-bold tracking-[0.2em] text-white/40 px-1">About</h3>
         <GlassCard className="p-6">
           <div className="flex flex-col items-center gap-4 text-center">
-            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center relative shadow-2xl">
-              <ShieldCheck size={40} className="text-white" />
-              <div className="absolute -inset-2 bg-indigo-500/20 blur-xl rounded-full -z-10" />
+            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-slate-600 to-zinc-800 flex items-center justify-center relative shadow-2xl">
+              <ShieldCheck size={40} className="text-slate-200" />
+              <div className="absolute -inset-2 bg-slate-500/10 blur-xl rounded-full -z-10" />
             </div>
             <div>
-              <h2 className="text-xl font-bold">Life Command Center</h2>
-              <p className="text-white/40 text-xs">v1.2.0 Stable Build</p>
+              <h2 className="text-xl font-bold text-slate-200 font-sans tracking-tight">Life Command Center</h2>
+              <p className="text-white/40 text-xs font-mono">v1.2.0 Stable Build</p>
             </div>
             <p className="text-sm text-white/60 leading-relaxed max-w-[240px]">
               A premium personal organizer designed for efficiency and aesthetic satisfaction.
