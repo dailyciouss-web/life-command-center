@@ -81,7 +81,7 @@ export const TasksView: React.FC = () => {
         </div>
       </header>
 
-      <section className="flex flex-col gap-4">
+      <section className="flex flex-col gap-6">
         {filteredRootIds.length === 0 ? (
           <div className="py-20 text-center flex flex-col items-center gap-4">
             <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center">

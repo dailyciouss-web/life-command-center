@@ -32,13 +32,33 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, onTabChange }
             )}
           >
             {activeTab === id && (
-              <div className="absolute inset-0 bg-white/10 rounded-full blur-md -z-10" />
+              <div className={cn(
+                "absolute inset-0 rounded-full blur-md -z-10",
+                id === 'tasks' && "bg-indigo-500/20",
+                id === 'today' && "bg-blue-500/20",
+                id === 'finances' && "bg-emerald-500/30",
+                id === 'debts' && "bg-sky-500/20",
+                id === 'settings' && "bg-white/10"
+              )} />
             )}
             <Icon size={22} className={cn(
               'transition-transform duration-300',
-              activeTab === id && 'scale-110'
+              activeTab === id && 'scale-110',
+              activeTab === id && id === 'tasks' && "text-indigo-400",
+              activeTab === id && id === 'today' && "text-blue-400",
+              activeTab === id && id === 'finances' && "text-emerald-400",
+              activeTab === id && id === 'debts' && "text-sky-400",
+              activeTab === id && id === 'settings' && "text-white"
             )} />
-            <span className="text-[10px] mt-1 font-medium tracking-tight uppercase">
+            <span className={cn(
+              "text-[10px] mt-1 font-medium tracking-tight uppercase transition-colors duration-300",
+              activeTab === id && id === 'tasks' && "text-indigo-300",
+              activeTab === id && id === 'today' && "text-blue-300",
+              activeTab === id && id === 'finances' && "text-emerald-300",
+              activeTab === id && id === 'debts' && "text-sky-300",
+              activeTab === id && id === 'settings' && "text-white/80",
+              activeTab !== id && "text-white/40"
+            )}>
               {label}
             </span>
           </button>

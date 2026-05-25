@@ -9,63 +9,100 @@ import { cn } from '../lib/utils';
 import { Expense, Income } from '../types';
 
 export const FinancesView: React.FC = () => {
-  const { state, setState, addExpense, addIncome } = useAppState();
+  const { state, setState, addExpense, addIncome, updateExpense, deleteExpense, deleteIncome } = useAppState();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [view, setView] = useState<'overview' | 'income' | 'expenses'>('overview');
+  const [isAdding, setIsAdding] = useState(false);
+  const [addingType, setAddingType] = useState<'income' | 'expense'>('expense');
   
   const monthKey = format(currentMonth, 'yyyy-MM');
   const budget = state.budgets[monthKey] || { id: monthKey, income: [], expenses: [] };
 
-  const totalIncome = useMemo(() => budget.income.reduce((sum, i) => sum + i.amount, 0), [budget.income]);
-  const totalExpenses = useMemo(() => budget.expenses.reduce((sum, e) => sum + e.amount, 0), [budget.expenses]);
-  const balance = totalIncome - totalExpenses;
+  // Calculate Virtual Recurring Items from previous months
+  const resolvedRecurring = useMemo(() => {
+    const sortedKeys = Object.keys(state.budgets).sort();
+    
+    const recIncome: Income[] = [];
+    const recExpenses: Expense[] = [];
+    
+    const existingSourceIds = new Set([
+      ...budget.income.map(i => i.sourceId || i.id),
+      ...budget.expenses.map(e => e.sourceId || e.id)
+    ]);
+
+    for (const key of sortedKeys) {
+      if (key >= monthKey) break;
+      const b = state.budgets[key];
+      
+      const monthsDiff = (parseInt(monthKey.split('-')[0]) * 12 + parseInt(monthKey.split('-')[1])) - 
+                        (parseInt(key.split('-')[0]) * 12 + parseInt(key.split('-')[1]));
+
+      b.income.forEach(i => {
+        if (!i.recurrence) return;
+        const isActive = i.recurrence.type === 'indefinite' || 
+                        (i.recurrence.type === 'repeat_months' && (i.recurrence.monthsCount || 0) > monthsDiff);
+        if (isActive && !existingSourceIds.has(i.id)) {
+          recIncome.push({ ...i, id: `v-${i.id}`, sourceId: i.id });
+          existingSourceIds.add(i.id);
+        }
+      });
+
+      b.expenses.forEach(e => {
+        if (!e.recurrence) return;
+        const isActive = e.recurrence.type === 'indefinite' || 
+                        (e.recurrence.type === 'repeat_months' && (e.recurrence.monthsCount || 0) > monthsDiff);
+        if (isActive && !existingSourceIds.has(e.id)) {
+          recExpenses.push({ ...e, id: `v-${e.id}`, sourceId: e.id, status: 'planned' });
+          existingSourceIds.add(e.id);
+        }
+      });
+    }
+    return { income: recIncome, expenses: recExpenses };
+  }, [state.budgets, monthKey, budget]);
+
+  const allIncome = useMemo(() => [...budget.income, ...resolvedRecurring.income], [budget.income, resolvedRecurring.income]);
+  const allExpenses = useMemo(() => [...budget.expenses, ...resolvedRecurring.expenses], [budget.expenses, resolvedRecurring.expenses]);
+
+  const totalIncome = allIncome.reduce((sum, i) => sum + i.amount, 0);
+  const plannedTotal = allExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const paidSoFar = allExpenses.filter(e => e.status === 'paid').reduce((sum, e) => sum + e.amount, 0);
+  const stillToPay = plannedTotal - paidSoFar;
+  const remainingAfterBills = totalIncome - plannedTotal;
 
   const chartData = useMemo(() => {
     const categories: Record<string, number> = {};
-    budget.expenses.forEach(e => {
+    allExpenses.forEach(e => {
       categories[e.category] = (categories[e.category] || 0) + e.amount;
     });
     return Object.entries(categories).map(([name, value]) => ({ name, value }));
-  }, [budget.expenses]);
+  }, [allExpenses]);
 
   const COLORS = ['#818cf8', '#34d399', '#fbbf24', '#f87171', '#c084fc', '#22d3ee'];
 
   const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
   const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
 
-  const copyPreviousBudget = () => {
-    const prevKey = format(subMonths(currentMonth, 1), 'yyyy-MM');
-    const prevBudget = state.budgets[prevKey];
-    if (!prevBudget) return alert('No previous budget found');
+  const planThisMonth = () => {
+    if (resolvedRecurring.income.length === 0 && resolvedRecurring.expenses.length === 0) {
+      setAddingType('income');
+      setIsAdding(true);
+      return;
+    }
 
-    const newExpenses = prevBudget.expenses
-      .filter(e => e.recurrence?.type === 'indefinite' || (e.recurrence?.monthsCount && e.recurrence.monthsCount > 0))
-      .map(e => ({ ...e, id: Math.random().toString(36).substr(2, 9), date: format(currentMonth, 'yyyy-MM-01') }));
-    
-    const newIncome = prevBudget.income
-      .filter(i => i.recurrence?.type === 'indefinite' || (i.recurrence?.monthsCount && i.recurrence.monthsCount > 0))
-      .map(i => ({ ...i, id: Math.random().toString(36).substr(2, 9), date: format(currentMonth, 'yyyy-MM-01') }));
-
-    setState(prev => ({
-      ...prev,
-      budgets: {
-        ...prev.budgets,
-        [monthKey]: {
-          ...budget,
-          income: [...budget.income, ...newIncome],
-          expenses: [...budget.expenses, ...newExpenses]
-        }
-      }
-    }));
+    // Materialize all virtual items into the state
+    resolvedRecurring.income.forEach(materializeIncome);
+    resolvedRecurring.expenses.forEach(e => {
+        const { id: _, ...expenseData } = e;
+        addExpense(monthKey, { ...expenseData });
+    });
   };
 
-  const [isAdding, setIsAdding] = useState(false);
-  const [addingType, setAddingType] = useState<'income' | 'expense'>('expense');
   const [newItem, setNewItem] = useState({ 
     name: '', 
     amount: 0, 
     category: 'Other', 
-    recurrence: 'once' as const,
+    recurrenceUnit: 'once' as const,
+    monthsCount: 12,
     date: format(currentMonth, 'yyyy-MM-dd'),
     notes: ''
   });
@@ -73,14 +110,19 @@ export const FinancesView: React.FC = () => {
   const handleAdd = () => {
     if (!newItem.name || !newItem.amount) return;
     
+    const recurrence = newItem.recurrenceUnit === 'once' ? { type: 'once' as const } :
+                     newItem.recurrenceUnit === 'indefinite' ? { type: 'indefinite' as const } :
+                     { type: 'repeat_months' as const, monthsCount: newItem.monthsCount };
+
     if (addingType === 'expense') {
       addExpense(monthKey, {
         name: newItem.name,
         amount: newItem.amount,
         category: newItem.category,
         date: newItem.date,
+        status: 'planned',
         isFixed: false,
-        recurrence: { type: newItem.recurrence as any },
+        recurrence,
         notes: newItem.notes
       });
     } else {
@@ -89,7 +131,7 @@ export const FinancesView: React.FC = () => {
         amount: newItem.amount,
         category: newItem.category,
         date: newItem.date,
-        recurrence: { type: newItem.recurrence as any },
+        recurrence,
         notes: newItem.notes
       });
     }
@@ -98,18 +140,36 @@ export const FinancesView: React.FC = () => {
       name: '', 
       amount: 0, 
       category: 'Other', 
-      recurrence: 'once',
+      recurrenceUnit: 'once',
+      monthsCount: 12,
       date: format(currentMonth, 'yyyy-MM-dd'),
       notes: ''
     });
     setIsAdding(false);
   };
 
+  const toggleStatus = (id: string, currentStatus: 'planned' | 'paid') => {
+    const isVirtual = id.startsWith('v-');
+    if (isVirtual) {
+       // Materialize it first
+       const virtual = resolvedRecurring.expenses.find(e => e.id === id);
+       if (!virtual) return;
+       const newId = Math.random().toString(36).substr(2, 9);
+       const { id: _, ...expenseData } = virtual;
+       addExpense(monthKey, { ...expenseData, status: 'paid' });
+    } else {
+       updateExpense(monthKey, id, { status: currentStatus === 'planned' ? 'paid' : 'planned' });
+    }
+  };
+
+  const materializeIncome = (virtual: Income) => {
+    const newId = Math.random().toString(36).substr(2, 9);
+    const { id: _, ...incomeData } = virtual;
+    addIncome(monthKey, { ...incomeData });
+  };
+
   const INCOME_CATEGORIES = ['Salary', 'Freelance', 'Side job', 'Gifts', 'Refunds', 'Other'];
   const EXPENSE_CATEGORIES = ['Food', 'Rent', 'Bills', 'Transport', 'Entertainment', 'Health', 'Other'];
-
-  const upcomingRisk = totalExpenses > totalIncome * 0.9 && balance > 0;
-  const deficit = totalExpenses > totalIncome;
 
   return (
     <div className="flex flex-col gap-6">
@@ -123,9 +183,6 @@ export const FinancesView: React.FC = () => {
           <button onClick={nextMonth} className="p-2 hover:bg-white/10 rounded-full text-white/40"><ChevronRight size={20}/></button>
         </div>
         <div className="flex gap-2">
-          <button onClick={copyPreviousBudget} title="Use previous as template" className="w-10 h-10 bg-white/5 border border-white/10 rounded-full flex items-center justify-center">
-            <Copy size={18} className="text-white/60"/>
-          </button>
           <button onClick={() => { setAddingType('expense'); setIsAdding(true); }} className="w-10 h-10 bg-indigo-500 rounded-full flex items-center justify-center">
             <Plus size={20} />
           </button>
@@ -201,14 +258,27 @@ export const FinancesView: React.FC = () => {
               onChange={e => setNewItem({...newItem, notes: e.target.value})}
             />
 
-            <select 
-              className="bg-white/5 border border-white/10 p-3 rounded-xl focus:outline-none text-white appearance-none text-xs"
-              value={newItem.recurrence}
-              onChange={e => setNewItem({...newItem, recurrence: e.target.value as any})}
-            >
-               <option value="once" className="bg-slate-900">One-time</option>
-               <option value="indefinite" className="bg-slate-900">Indefinitely recurring</option>
-            </select>
+            <div className="flex gap-2">
+              <select 
+                className="flex-1 bg-white/5 border border-white/10 p-3 rounded-xl focus:outline-none text-white appearance-none text-xs"
+                value={newItem.recurrenceUnit}
+                onChange={e => setNewItem({...newItem, recurrenceUnit: e.target.value as any})}
+              >
+                 <option value="once" className="bg-slate-900">One-time</option>
+                 <option value="indefinite" className="bg-slate-900">Every month until stopped</option>
+                 <option value="repeat_months" className="bg-slate-900">Repeat for X months</option>
+              </select>
+
+              {newItem.recurrenceUnit === 'repeat_months' && (
+                <input 
+                  type="number"
+                  className="w-20 bg-white/5 border border-white/10 p-3 rounded-xl focus:outline-none text-white text-xs"
+                  placeholder="Count"
+                  value={newItem.monthsCount}
+                  onChange={e => setNewItem({...newItem, monthsCount: Number(e.target.value)})}
+                />
+              )}
+            </div>
 
             <div className="flex gap-2">
               <button onClick={() => setIsAdding(false)} className="flex-1 p-3 rounded-xl font-bold uppercase tracking-widest bg-white/5 text-white/40">Cancel</button>
@@ -223,118 +293,143 @@ export const FinancesView: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Alerts */}
-      {deficit && (
-        <GlassCard className="p-4 border-rose-500/50 bg-rose-500/10 flex items-center gap-3 animate-pulse">
-          <AlertTriangle className="text-rose-500" />
-          <p className="text-xs font-medium text-rose-200">Deficit Alert: Expenses exceed total income for this month.</p>
-        </GlassCard>
-      )}
-      {upcomingRisk && !deficit && (
-        <GlassCard className="p-4 border-amber-500/50 bg-amber-500/10 flex items-center gap-3">
-          <AlertTriangle className="text-amber-500" />
-          <p className="text-xs font-medium text-amber-200">Low Balance Warning: Spending is close to 90% of total income.</p>
-        </GlassCard>
-      )}
-
       {view === 'overview' && (
-        <>
-          <section className="grid grid-cols-2 gap-4">
-            <GlassCard className="p-4" intensity="high">
-              <p className="text-[10px] text-white/40 uppercase font-bold tracking-wider mb-1">Balance</p>
-              <h2 className={cn("text-2xl font-bold truncate", balance >= 0 ? "text-emerald-400" : "text-rose-400")}>
-                ${balance.toLocaleString()}
-              </h2>
-            </GlassCard>
-            <GlassCard className="p-4" intensity="high">
-              <p className="text-[10px] text-white/40 uppercase font-bold tracking-wider mb-1">Total Savings</p>
-              <h2 className="text-2xl font-bold text-indigo-400 truncate">
-                ${(totalIncome * 0.2).toLocaleString()}*
-              </h2>
-            </GlassCard>
-          </section>
+        <div className="flex flex-col gap-6">
+          {allIncome.length === 0 && allExpenses.length === 0 ? (
+            <div className="flex flex-col items-center justify-center p-10 border-2 border-dashed border-white/10 rounded-3xl gap-4">
+               <Wallet size={48} className="text-white/10" />
+               <p className="text-white/40 text-sm font-medium text-center">Manage your finances for {format(currentMonth, 'MMMM')}.</p>
+               <button 
+                onClick={planThisMonth}
+                className="px-6 py-3 bg-indigo-500 rounded-full font-bold uppercase tracking-widest text-xs"
+               >Plan this month</button>
+            </div>
+          ) : (
+            <>
+              <section className="grid grid-cols-1 gap-4">
+                <GlassCard className="p-5 flex flex-col gap-2" intensity="high">
+                  <p className="text-[10px] text-white/40 uppercase font-bold tracking-widest">Remaining After Bills</p>
+                  <h2 className={cn("text-3xl font-bold truncate", remainingAfterBills >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                    ${remainingAfterBills.toLocaleString()}
+                  </h2>
+                </GlassCard>
+              </section>
 
-          <section className="grid grid-cols-2 gap-4">
-             <GlassCard className="p-4 flex flex-col gap-1">
-                <div className="flex items-center justify-between">
-                   <p className="text-[10px] text-white/40 uppercase font-bold">Income</p>
-                   <ArrowUpRight size={14} className="text-emerald-400" />
-                </div>
-                <p className="text-xl font-semibold">${totalIncome.toLocaleString()}</p>
-             </GlassCard>
-             <GlassCard className="p-4 flex flex-col gap-1">
-                <div className="flex items-center justify-between">
-                   <p className="text-[10px] text-white/40 uppercase font-bold">Expense</p>
-                   <ArrowDownRight size={14} className="text-rose-400" />
-                </div>
-                <p className="text-xl font-semibold">${totalExpenses.toLocaleString()}</p>
-             </GlassCard>
-          </section>
-
-          <GlassCard className="p-6 h-[260px]">
-            {chartData.length > 0 ? (
-              <div className="flex h-full items-center">
-                <div className="flex-grow">
-                  <ResponsiveContainer width="100%" height={200}>
-                    <PieChart>
-                      <Pie
-                        data={chartData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {chartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        contentStyle={{ background: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: '12px', fontSize: '12px' }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="flex flex-col gap-2 min-w-[120px]">
-                  {chartData.slice(0, 4).map((entry, index) => (
-                    <div key={entry.name} className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                      <span className="text-[10px] text-white/60 truncate">{entry.name}</span>
+              <section className="grid grid-cols-2 gap-4">
+                 <GlassCard className="p-4 flex flex-col gap-1 border-emerald-500/10">
+                    <div className="flex items-center justify-between">
+                       <p className="text-[10px] text-white/40 uppercase font-bold">Exp. Income</p>
+                       <ArrowUpRight size={14} className="text-emerald-400" />
                     </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="h-full flex items-center justify-center text-white/20 text-sm italic">
-                No expense data for this month.
-              </div>
-            )}
-          </GlassCard>
-        </>
+                    <p className="text-xl font-semibold">${totalIncome.toLocaleString()}</p>
+                 </GlassCard>
+                 <GlassCard className="p-4 flex flex-col gap-1 border-rose-500/10">
+                    <div className="flex items-center justify-between">
+                       <p className="text-[10px] text-white/40 uppercase font-bold">Planned Exp.</p>
+                       <ArrowDownRight size={14} className="text-rose-400" />
+                    </div>
+                    <p className="text-xl font-semibold">${plannedTotal.toLocaleString()}</p>
+                 </GlassCard>
+              </section>
+
+              <section className="grid grid-cols-2 gap-4 opacity-80">
+                 <GlassCard className="p-3 border-emerald-500/5 bg-emerald-500/5">
+                    <p className="text-[9px] text-emerald-400/60 uppercase font-bold mb-1">Paid So Far</p>
+                    <p className="text-lg font-medium text-emerald-400/90">${paidSoFar.toLocaleString()}</p>
+                 </GlassCard>
+                 <GlassCard className="p-3 border-rose-500/5 bg-rose-500/5">
+                    <p className="text-[9px] text-rose-400/60 uppercase font-bold mb-1">Still To Pay</p>
+                    <p className="text-lg font-medium text-rose-400/90">${stillToPay.toLocaleString()}</p>
+                 </GlassCard>
+              </section>
+
+              <GlassCard className="p-6 h-[260px]">
+                {chartData.length > 0 ? (
+                  <div className="flex h-full items-center">
+                    <div className="flex-grow">
+                      <ResponsiveContainer width="100%" height={200}>
+                        <PieChart>
+                          <Pie
+                            data={chartData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="value"
+                          >
+                            {chartData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip 
+                            contentStyle={{ background: 'rgba(0,0,0,0.8)', border: 'none', borderRadius: '12px', fontSize: '12px' }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="flex flex-col gap-2 min-w-[120px]">
+                      {chartData.slice(0, 4).map((entry, index) => (
+                        <div key={entry.name} className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                          <span className="text-[10px] text-white/60 truncate">{entry.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center gap-3">
+                    <TrendingDown size={32} className="text-white/10" />
+                    <p className="text-white/20 text-xs italic">No expenses planned for this month yet.</p>
+                  </div>
+                )}
+              </GlassCard>
+              
+              {allIncome.length === 0 && (
+                <p className="text-center text-white/20 text-[10px] uppercase font-bold tracking-widest bg-white/5 py-4 rounded-2xl border border-dashed border-white/5">
+                  No income planned for this month yet.
+                </p>
+              )}
+            </>
+          )}
+        </div>
       )}
 
       {view === 'income' && (
         <section className="flex flex-col gap-4">
-          <h3 className="text-xs uppercase font-bold tracking-[0.2em] text-white/40 px-1">Sources</h3>
-          {budget.income.length === 0 ? (
-            <p className="text-center py-10 text-white/20 text-sm italic">No income sources listed.</p>
+          <div className="flex justify-between items-center px-1">
+            <h3 className="text-xs uppercase font-bold tracking-[0.2em] text-white/40">Expected Income</h3>
+            <span className="text-xs font-bold text-emerald-400">${totalIncome.toLocaleString()}</span>
+          </div>
+          {allIncome.length === 0 ? (
+            <p className="text-center py-20 text-white/20 text-sm italic">No entries.</p>
           ) : (
-            budget.income.map(i => (
-              <GlassCard key={i.id} className="p-4 flex items-center justify-between border-emerald-500/10">
+            allIncome.map(i => (
+              <GlassCard key={i.id} className={cn("p-4 flex items-center justify-between border-emerald-500/10", i.id.startsWith('v-') && "opacity-60")}>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-2xl bg-emerald-500/5 flex items-center justify-center border border-emerald-500/10">
                     <TrendingUp size={20} className="text-emerald-400/80" />
                   </div>
                   <div>
                     <p className="text-sm font-medium">{i.name}</p>
-                    <p className="text-[10px] text-white/40 uppercase">{i.category} • {i.recurrence?.type}</p>
-                    {i.notes && <p className="text-[10px] text-indigo-300/60 mt-1 italic line-clamp-1">{i.notes}</p>}
+                    <p className="text-[10px] text-white/40 uppercase">{i.category} {i.recurrence?.type !== 'once' && '• Recurring'}</p>
+                    <p className="text-[9px] text-emerald-400/60 font-medium">Expected: {format(new Date(i.date), 'MMM d, yyyy')}</p>
+                    {i.notes && <p className="text-[10px] text-white/20 mt-1 italic">{i.notes}</p>}
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-emerald-400">+${i.amount.toLocaleString()}</p>
-                  <p className="text-[10px] text-white/40">{format(new Date(i.date), 'MMM d')}</p>
+                <div className="flex flex-col items-end gap-1">
+                   {i.id.startsWith('v-') ? (
+                     <button 
+                      onClick={() => materializeIncome(i)}
+                      className="px-2 py-1 bg-emerald-500 rounded text-[9px] font-bold uppercase"
+                     >Add to plan</button>
+                   ) : (
+                     <button 
+                      onClick={() => deleteIncome(monthKey, i.id)}
+                      className="p-1 text-white/10 hover:text-rose-400 transition-colors"
+                     ><Plus size={14} className="rotate-45" /></button>
+                   )}
+                   <p className="text-sm font-bold text-emerald-400">+${i.amount.toLocaleString()}</p>
                 </div>
               </GlassCard>
             ))
@@ -344,26 +439,51 @@ export const FinancesView: React.FC = () => {
 
       {view === 'expenses' && (
         <section className="flex flex-col gap-4">
-          <h3 className="text-xs uppercase font-bold tracking-[0.2em] text-white/40 px-1">Recent Expenses</h3>
-          {budget.expenses.length === 0 ? (
-             <p className="text-center py-10 text-white/20 text-sm italic">No expenses logged.</p>
+          <div className="flex justify-between items-center px-1">
+            <h3 className="text-xs uppercase font-bold tracking-[0.2em] text-white/40">Planned Expenses</h3>
+            <span className="text-xs font-bold text-rose-400">-${plannedTotal.toLocaleString()}</span>
+          </div>
+          {allExpenses.length === 0 ? (
+             <p className="text-center py-20 text-white/20 text-sm italic">No entries.</p>
           ) : (
-            budget.expenses.map(expense => (
-              <GlassCard key={expense.id} className="p-4 flex items-center justify-between border-rose-500/10">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-rose-500/5 flex items-center justify-center border border-rose-500/10">
-                    <TrendingDown size={20} className="text-rose-400/80" />
+            allExpenses.map(expense => (
+              <GlassCard key={expense.id} className={cn("p-4 flex flex-col gap-3 border-rose-500/10 transition-all", expense.status === 'paid' && "opacity-40 grayscale-[0.5]", expense.id.startsWith('v-') && "opacity-60")}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={() => toggleStatus(expense.id, expense.status)}
+                      className={cn(
+                        "w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all",
+                        expense.status === 'paid' ? "bg-emerald-500 border-emerald-400 text-white" : "border-white/10"
+                      )}
+                    >
+                      {expense.status === 'paid' && <Plus size={20} className="rotate-45" />}
+                    </button>
+                    <div>
+                      <p className={cn("text-sm font-medium", expense.status === 'paid' && "line-through")}>{expense.name}</p>
+                      <p className="text-[10px] text-white/40 uppercase">{expense.category} {expense.status === 'paid' ? '• PAID' : '• PLANNED'}</p>
+                      <p className="text-[9px] text-rose-400/60 font-medium">Due: {format(new Date(expense.date), 'MMM d, yyyy')}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium">{expense.name}</p>
-                    <p className="text-[10px] text-white/40 uppercase">{expense.category} • {expense.recurrence?.type}</p>
-                    {expense.notes && <p className="text-[10px] text-indigo-300/60 mt-1 italic line-clamp-1">{expense.notes}</p>}
+                  <div className="text-right flex flex-col items-end gap-1">
+                    {!expense.id.startsWith('v-') ? (
+                      <button 
+                        onClick={() => deleteExpense(monthKey, expense.id)}
+                        className="p-1 text-white/10 hover:text-rose-400 transition-colors"
+                      ><Plus size={14} className="rotate-45" /></button>
+                    ) : (
+                      <button 
+                        onClick={() => {
+                            const { id: _, ...expenseData } = expense;
+                            addExpense(monthKey, { ...expenseData });
+                        }}
+                        className="px-2 py-1 bg-white/5 border border-white/10 rounded text-[9px] font-bold uppercase"
+                      >Add to plan</button>
+                    )}
+                    <p className="text-sm font-bold text-rose-400">-${expense.amount.toLocaleString()}</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-rose-400">-${expense.amount.toLocaleString()}</p>
-                  <p className="text-[10px] text-white/40">{format(new Date(expense.date), 'MMM d')}</p>
-                </div>
+                {expense.notes && <p className="text-[10px] text-white/20 italic px-1">{expense.notes}</p>}
               </GlassCard>
             ))
           )}

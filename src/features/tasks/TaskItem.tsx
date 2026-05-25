@@ -40,7 +40,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   const colorWithIntensity = isGroup ? `hsla(${hexToHue(task.color)}, ${saturation}%, 50%, ${opacity})` : `${task.color}${task.isCompleted ? 'ff' : '44'}`;
 
   return (
-    <div className={cn("flex flex-col gap-2", depth > 0 && "ml-4 border-l border-white/10 pl-4 py-1")}>
+    <div className={cn("flex flex-col gap-3", depth > 0 && "ml-4 border-l border-white/10 pl-4 py-1")}>
       <GlassCard 
         className={cn(
           "transition-all duration-500",
@@ -52,10 +52,10 @@ export const TaskItem: React.FC<TaskItemProps> = ({
           background: isGroup ? `rgba(255,255,255, ${0.05 + (completion * 0.1)})` : undefined
         }}
       >
-        <div className="flex items-center p-4 gap-3">
+        <div className="flex items-start p-4 gap-3">
           <button 
             onClick={() => onUpdate(taskId, { isCompleted: !task.isCompleted })}
-            className="flex-shrink-0"
+            className="flex-shrink-0 mt-0.5"
           >
             {task.isCompleted ? (
               <CheckCircle2 size={24} style={{ color: task.color }} />
@@ -65,21 +65,21 @@ export const TaskItem: React.FC<TaskItemProps> = ({
           </button>
 
           <div className="flex-grow min-w-0" onClick={() => isGroup && setIsExpanded(!isExpanded)}>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h3 className={cn(
-                "text-base font-medium truncate transition-colors duration-500",
+                "text-base font-medium break-words transition-colors duration-500 flex-1",
                 task.isCompleted ? "text-white/40 line-through" : "text-white"
               )}>
                 {task.name}
               </h3>
               {isGroup && (
-                 <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded-full text-white/60">
+                 <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded-full text-white/60 flex-shrink-0">
                    {Math.round(completion * 100)}%
                  </span>
               )}
             </div>
             {task.notes && (
-              <p className="text-xs text-white/40 mt-0.5 truncate">{task.notes}</p>
+              <p className="text-xs text-white/40 mt-1 break-words">{task.notes}</p>
             )}
           </div>
 

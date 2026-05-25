@@ -45,16 +45,7 @@ const INITIAL_TASKS: Record<string, Task> = {
 const INITIAL_STATE: AppState = {
   tasks: INITIAL_TASKS,
   rootTaskIds: ['t1'],
-  budgets: {
-    [format(new Date(), 'yyyy-MM')]: {
-      id: format(new Date(), 'yyyy-MM'),
-      income: [{ id: 'i1', name: 'Salary', amount: 5000, date: format(new Date(), 'yyyy-MM-01'), category: 'Salary', recurrence: { type: 'indefinite' } }],
-      expenses: [
-        { id: 'e1', name: 'Rent', amount: 1500, category: 'Rent', date: format(new Date(), 'yyyy-MM-01'), recurrence: { type: 'indefinite' }, isFixed: true },
-        { id: 'e2', name: 'Groceries', amount: 400, category: 'Food', date: format(new Date(), 'yyyy-MM-05'), isFixed: false }
-      ]
-    }
-  },
+  budgets: {},
   debts: [
     {
       id: 'd1',
@@ -180,6 +171,40 @@ export function useAppState() {
     });
   }, []);
 
+  const updateExpense = useCallback((monthKey: string, id: string, updates: Partial<Expense>) => {
+    setState(prev => {
+      const budget = prev.budgets[monthKey];
+      if (!budget) return prev;
+      return {
+        ...prev,
+        budgets: {
+          ...prev.budgets,
+          [monthKey]: {
+            ...budget,
+            expenses: budget.expenses.map(e => e.id === id ? { ...e, ...updates } : e)
+          }
+        }
+      };
+    });
+  }, []);
+
+  const deleteExpense = useCallback((monthKey: string, id: string) => {
+    setState(prev => {
+      const budget = prev.budgets[monthKey];
+      if (!budget) return prev;
+      return {
+        ...prev,
+        budgets: {
+          ...prev.budgets,
+          [monthKey]: {
+            ...budget,
+            expenses: budget.expenses.filter(e => e.id !== id)
+          }
+        }
+      };
+    });
+  }, []);
+
   const addIncome = useCallback((monthKey: string, income: Omit<Income, 'id'>) => {
     const id = uuidv4();
     setState(prev => {
@@ -191,6 +216,40 @@ export function useAppState() {
           [monthKey]: {
             ...budget,
             income: [...budget.income, { ...income, id }]
+          }
+        }
+      };
+    });
+  }, []);
+
+  const updateIncome = useCallback((monthKey: string, id: string, updates: Partial<Income>) => {
+    setState(prev => {
+      const budget = prev.budgets[monthKey];
+      if (!budget) return prev;
+      return {
+        ...prev,
+        budgets: {
+          ...prev.budgets,
+          [monthKey]: {
+            ...budget,
+            income: budget.income.map(i => i.id === id ? { ...i, ...updates } : i)
+          }
+        }
+      };
+    });
+  }, []);
+
+  const deleteIncome = useCallback((monthKey: string, id: string) => {
+    setState(prev => {
+      const budget = prev.budgets[monthKey];
+      if (!budget) return prev;
+      return {
+        ...prev,
+        budgets: {
+          ...prev.budgets,
+          [monthKey]: {
+            ...budget,
+            income: budget.income.filter(i => i.id !== id)
           }
         }
       };
@@ -286,7 +345,11 @@ export function useAppState() {
     updateTask,
     deleteTask,
     addExpense,
+    updateExpense,
+    deleteExpense,
     addIncome,
+    updateIncome,
+    deleteIncome,
     addDebt,
     importData,
     exportData,

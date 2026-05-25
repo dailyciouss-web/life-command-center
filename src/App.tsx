@@ -29,7 +29,7 @@ export default function App() {
 
   return (
     <div className="relative min-h-screen text-white font-sans selection:bg-indigo-500/30 overflow-x-hidden">
-      <Background />
+      <Background activeTab={activeTab} />
       
       <main className="pb-32 pt-6 px-4 max-w-lg mx-auto w-full">
         <AnimatePresence mode="wait">

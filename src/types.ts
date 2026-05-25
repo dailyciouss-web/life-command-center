@@ -29,11 +29,13 @@ export type ExpenseCategory =
 
 export interface Expense {
   id: string;
+  sourceId?: string;
   name: string;
   amount: number;
   category: ExpenseCategory | string;
   date: string;
   notes?: string;
+  status: 'planned' | 'paid';
   recurrence?: {
     type: 'once' | 'repeat_months' | 'indefinite';
     monthsCount?: number; // max 24
@@ -43,6 +45,7 @@ export interface Expense {
 
 export interface Income {
   id: string;
+  sourceId?: string;
   name: string;
   amount: number;
   date: string;
